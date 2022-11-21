@@ -3,19 +3,20 @@ The Python script to get podcast data from given sites and organize it into .csv
 """
 import xml.etree.ElementTree as ET
 from datetime import date
-from typing import Tuple, List
+from typing import List, Tuple
 from urllib.request import urlopen
 
 import gspread
 
 
-def get_podcast_data(feed_url: str, last_download: date) -> List[dict]:
+def get_podcast_data(feed_url: str, start_date: date, end_date: date = date.today()) -> List[dict]:
 	"""
 	Function to extract podcast data from RSS feed
 
 	:param feed_url: URL of the RSS feed
-	:param last_download: Date when the program run last time
-	:return: List of episodes of a podcast with given RSS feed since the last_download
+	:param start_date: Earliest day from which podcasts are to be added
+	:param end_date: Latest day from which podcasts are to be added
+	:return: List of episodes of a podcast with given RSS feed since the start_date
 	"""
 	episodes = []
 	root = ET.parse(urlopen(feed_url)).getroot()
@@ -39,10 +40,39 @@ def get_podcast_data(feed_url: str, last_download: date) -> List[dict]:
 						attr.text = f'0:{attr.text}'
 
 			episode[attr.tag] = attr.text
-		if episode['pubDate'] < last_download:
+		if episode['pubDate'] < start_date:
 			break
+		elif episode['pubDate'] > end_date:
+			continue
 		episodes.append(episode)
 	return episodes
+
+
+def load_data() -> Tuple[dict, date, date]:
+	"""
+	Function to load all necessary data
+
+	:return: Tuple of podcast sources, start and end dates
+	"""
+	podcast_sources = "podcast_sources.csv"
+	sources = load_podcast_sources(podcast_sources)
+	while True:
+		s_date = input("Input start date in yyyy/mm/dd format")
+		try:
+			start_date = date(*[int(i) for i in s_date.split('/')])
+			break
+		except Exception:
+			pass
+	while True:
+		e_date = input("Input end date in yyyy/mm/dd format or press 'Enter' for today")
+		try:
+			end_date = date(*[int(i) for i in e_date.split('/')])
+			break
+		except Exception:
+			if e_date == '':
+				end_date = today
+				break
+	return sources, start_date, end_date
 
 
 def load_podcast_sources(podcast_sources: str):
@@ -59,22 +89,6 @@ def load_podcast_sources(podcast_sources: str):
 		return data
 
 
-def load_internal_data() -> Tuple[date]:
-	"""
-	Function to load data from previous downloads. If no file found, assumes it's the first time.
-
-	:return: Tuple of that data
-	"""
-	try:
-		with open("internal_data.txt") as f:
-			data = f.readlines()
-			data = [line.strip().split() for line in data]
-			last_download = date(*[int(i) for i in data[0]])
-	except Exception:
-		last_download = today
-	return last_download,
-
-
 def save_data(podcasts: dict) -> None:
 	"""
 	Function to save data to .csv file
@@ -82,11 +96,13 @@ def save_data(podcasts: dict) -> None:
 	:param podcasts: Podcasts to be saved
 	"""
 	gc = gspread.service_account(filename='credentials.json')
-	with open('output_worksheet_info.txt',encoding='utf-8')as f:
+	with open('output_worksheet_info.txt', encoding='utf-8') as f:
 		key = f.readline().strip().split(':')[1]
 		sheet = f.readline().strip().split(':')[1]
+		main_sheet_name = f.readline().strip().split(':')[1]
 	sh = gc.open_by_key(key)
 	worksheet = sh.worksheet(sheet)
+	main_sheet = sh.worksheet(main_sheet_name)
 	to_save = []
 	for name, episodes in podcasts.items():
 		for ep in episodes:
@@ -94,23 +110,27 @@ def save_data(podcasts: dict) -> None:
 			to_save.append([name, title, str(ep['pubDate']), str(today), ep['duration'], '0'])
 	worksheet.append_rows(to_save, value_input_option='USER_ENTERED')
 
-	with open("internal_data.txt", 'w') as f:
-		f.write(f"{today.year} {today.month} {today.day}")
+	while True:
+		reply = input("Enter 's' to sort the main list, 'e' to exit the program").lower()
+		if reply == 'e':
+			return
+		if reply == 's':
+			break
+	var = main_sheet.row_count
+	main_sheet.sort((1, 'asc'), (3, 'asc'), (2, 'asc'), range=f'A2:G{var}')
 
 
 def main() -> None:
 	"""
 	Main function of the script
 	"""
-	podcast_sources = "podcast_sources.csv"
+	sources, start_date, end_date = load_data()
 
-	sources = load_podcast_sources(podcast_sources)
-	last_download, = load_internal_data()
 	podcasts = {}
 
 	for name, feed_url in sources.items():
 		try:
-			podcasts[name] = get_podcast_data(feed_url, last_download)
+			podcasts[name] = get_podcast_data(feed_url, start_date, end_date)
 		except Exception:
 			print(f"There's a problem with {name} podcast, probably access forbidden")
 
@@ -122,7 +142,7 @@ if __name__ == '__main__':
 		'Jan': 1, 'Feb': 2, 'Mar': 3,
 		'Apr': 4, 'May': 5, 'Jun': 6,
 		'Jul': 7, 'Aug': 8, 'Sep': 9,
-		'Oct':10, 'Nov':11, 'Dec':12
+		'Oct': 10, 'Nov': 11, 'Dec': 12
 	}
-	today = date.today()
+	today = date.today()  # initiated here to make this two variables global
 	main()
