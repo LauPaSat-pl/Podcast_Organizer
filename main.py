@@ -1,6 +1,7 @@
 """
 The Python script to get podcast data from given sites and organize it into .csv table
 """
+import time
 import xml.etree.ElementTree as ET
 from datetime import date
 from typing import List, Tuple
@@ -57,12 +58,14 @@ def load_data() -> Tuple[dict, date, date]:
 	podcast_sources = "podcast_sources.csv"
 	sources = load_podcast_sources(podcast_sources)
 	while True:
-		s_date = input("Input start date in yyyy/mm/dd format")
+		s_date = input("Input start date in yyyy/mm/dd format or press 'Enter' for today")
 		try:
 			start_date = date(*[int(i) for i in s_date.split('/')])
 			break
 		except Exception:
-			pass
+			if s_date == '':
+				start_date = today
+				break
 	while True:
 		e_date = input("Input end date in yyyy/mm/dd format or press 'Enter' for today")
 		try:
@@ -103,12 +106,11 @@ def save_data(podcasts: dict) -> None:
 	sh = gc.open_by_key(key)
 	worksheet = sh.worksheet(sheet)
 	main_sheet = sh.worksheet(main_sheet_name)
-	to_save = []
 	for name, episodes in podcasts.items():
 		for ep in episodes:
 			title = ep['title'].split('|')[0]
-			to_save.append([name, title, str(ep['pubDate']), str(today), ep['duration'], '0'])
-	worksheet.append_rows(to_save, value_input_option='USER_ENTERED')
+			worksheet.append_row([name, title, str(ep['pubDate']), str(today), ep['duration'], '0'], value_input_option='USER_ENTERED')
+			time.sleep(1)
 
 	while True:
 		reply = input("Enter 's' to sort the main list, 'e' to exit the program").lower()
@@ -131,6 +133,7 @@ def main() -> None:
 	for name, feed_url in sources.items():
 		try:
 			podcasts[name] = get_podcast_data(feed_url, start_date, end_date)
+			print(f'Podcast {name} has been prepared')
 		except Exception:
 			print(f"There's a problem with {name} podcast, probably access forbidden")
 
@@ -142,7 +145,7 @@ if __name__ == '__main__':
 		'Jan': 1, 'Feb': 2, 'Mar': 3,
 		'Apr': 4, 'May': 5, 'Jun': 6,
 		'Jul': 7, 'Aug': 8, 'Sep': 9,
-		'Oct': 10, 'Nov': 11, 'Dec': 12
+		'Oct':10, 'Nov':11, 'Dec':12
 	}
-	today = date.today()  # initiated here to make this two variables global
+	today = date.today()  # initiated here to make these two variables global
 	main()
