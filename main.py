@@ -4,19 +4,18 @@ The Python script to get podcast data from given sites and organize it into .csv
 import time
 import xml.etree.ElementTree as ET
 from datetime import date
-from typing import List, Tuple
 from urllib.request import urlopen
 
 import gspread
 
 
-def get_podcast_data(feed_url: str, start_date: date, end_date: date = date.today()) -> List[dict]:
+def get_podcast_data(feed_url: str, start_date: date, end_date: date = date.today()) -> list[dict]:
 	"""
 	Function to extract podcast data from RSS feed
 
 	:param feed_url: URL of the RSS feed
-	:param start_date: Earliest day from which podcasts are to be added
-	:param end_date: Latest day from which podcasts are to be added
+	:param start_date: The earliest day from which podcasts are to be added
+	:param end_date: The latest day from which podcasts are to be added
 	:return: List of episodes of a podcast with given RSS feed since the start_date
 	"""
 	episodes = []
@@ -49,7 +48,7 @@ def get_podcast_data(feed_url: str, start_date: date, end_date: date = date.toda
 	return episodes
 
 
-def load_data() -> Tuple[dict, date, date]:
+def load_data() -> tuple[dict, date, date]:
 	"""
 	Function to load all necessary data
 
@@ -109,7 +108,8 @@ def save_data(podcasts: dict) -> None:
 	for name, episodes in podcasts.items():
 		for ep in episodes:
 			title = ep['title'].split('|')[0]
-			worksheet.append_row([name, title, str(ep['pubDate']), str(today), ep['duration'], '0'], value_input_option='USER_ENTERED')
+			worksheet.append_row([name, title, str(ep['pubDate']), str(today), ep['duration'], '0'],
+			                     value_input_option='USER_ENTERED')
 			time.sleep(1)
 
 	while True:
