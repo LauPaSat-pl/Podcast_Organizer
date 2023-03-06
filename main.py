@@ -2,8 +2,10 @@
 The Python script to get podcast data from given sites and organize it into .csv table
 """
 import time
+import urllib.error
 import xml.etree.ElementTree as ET
 from datetime import date
+from dateutil import parser
 from urllib.request import urlopen
 
 import gspread
@@ -28,10 +30,7 @@ def get_podcast_data(feed_url: str, start_date: date, end_date: date = date.toda
 		for attr in ep:
 			attr.tag = attr.tag.split("{http://www.itunes.com/dtds/podcast-1.0.dtd}")[-1]
 			if attr.tag == "pubDate":
-				# noinspection PyUnresolvedReferences
-				split_date = attr.text.split()
-				# noinspection PyUnresolvedReferences
-				attr.text = date(int(split_date[3]), dates_map[split_date[2]], int(split_date[1]))
+				attr.text = parser.parse(attr.text).date()
 			elif attr.tag == 'duration':
 				match len(attr.text.split(':')):
 					case 1:
@@ -59,16 +58,16 @@ def load_data() -> tuple[dict, date, date]:
 	while True:
 		s_date = input("Input start date in yyyy/mm/dd format or press 'Enter' for today")
 		try:
-			start_date = date(*[int(i) for i in s_date.split('/')])
+			start_date = parser.parse(s_date)
 			break
-		except Exception:
+		except ValueError:
 			if s_date == '':
 				start_date = today
 				break
 	while True:
 		e_date = input("Input end date in yyyy/mm/dd format or press 'Enter' for today")
 		try:
-			end_date = date(*[int(i) for i in e_date.split('/')])
+			end_date = parser.parse(e_date)
 			break
 		except Exception:
 			if e_date == '':
@@ -134,18 +133,15 @@ def main() -> None:
 		try:
 			podcasts[name] = get_podcast_data(feed_url, start_date, end_date)
 			print(f'Podcast {name} has been prepared')
-		except Exception:
+		except urllib.error.HTTPError:
 			print(f"There's a problem with {name} podcast, probably access forbidden")
+		except urllib.error.URLError:
+			print(f"There's a problem with {name} podcast, probably there's no internet connection")
+			raise Exception("There's no Internet")
 
 	save_data(podcasts)
 
 
 if __name__ == '__main__':
-	dates_map = {
-		'Jan': 1, 'Feb': 2, 'Mar': 3,
-		'Apr': 4, 'May': 5, 'Jun': 6,
-		'Jul': 7, 'Aug': 8, 'Sep': 9,
-		'Oct':10, 'Nov':11, 'Dec':12
-	}
 	today = date.today()  # initiated here to make these two variables global
 	main()
